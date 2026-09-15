@@ -16,3 +16,4 @@ __pycache__/
 
 # Plugin install artifacts (none expected, but defensive)
 .installed.json
+.axgraph/

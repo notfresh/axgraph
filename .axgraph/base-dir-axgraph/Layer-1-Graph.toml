@@ -1,8 +1,0 @@
-# Layer 1: module/file distribution. See SCHEMA.md for node/edge format.
-# Add nodes like:
-#   [[nodes]]
-#   id = "mod.<name>"
-#   kind = "module"
-#   path = "<path>"
-#   layer = "core"
-#   desc = "..."
