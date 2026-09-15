@@ -13,6 +13,7 @@
       → 调用 zzz [链路内 ✓ / 链路外]  (来源: import 映射)
 """
 import ast
+import os
 import sys
 try:
     import tomllib  # Python 3.11+ stdlib
@@ -26,18 +27,41 @@ except ImportError:  # pragma: no cover
         )
 from pathlib import Path
 
-ROOT = Path("/root/projects/hermes-agent-plus")
-BASE = Path(__file__).parent
+# 被分析的源码根（不是 axgraph 插件根）。优先顺序：
+#   1. 命令行 --project-root
+#   2. 环境变量 AX_GRAPH_PROJECT_ROOT
+#   3. 当前工作目录
+# 这样 init 后的任意项目里跑 `ax extract` 都能找到自己的源码树。
+PROJECT_ROOT = Path(os.environ.get("AX_GRAPH_PROJECT_ROOT", ".")).resolve()
 
 
-def load_func_nodes():
-    """从所有 Layer-3-*.toml 加载函数节点"""
+def load_func_nodes(base_dir: Path = None):
+    """从所有 Layer-3-*.toml 加载函数节点。
+
+    axgraph init 生成的目录布局是：
+        .axgraph/
+            SCHEMA.md
+            base-dir-<项目名>/
+                Layer-1-Graph.toml
+                Layer-2-Graph.toml
+                Layer-3-Graph-<feature>.toml   ← 我们要扫这些
+                base.toml
+
+    所以 glob 要递归一层；跨 base-dir-* 的多个 base 也都要扫到。
+    """
     funcs = []
-    files = sorted(BASE.glob("Layer-3-*.toml"))
+    if base_dir is None:
+        base_dir = PROJECT_ROOT / ".axgraph"
+    # 递归搜 .axgraph/ 下所有 Layer-3-*.toml（覆盖任意 base-* 子目录）
+    files = sorted(base_dir.glob("**/Layer-3-*.toml"))
     for p in files:
-        d = tomllib.load(open(p, "rb"))
-        for n in d["nodes"]:
-            if n["kind"] == "function":
+        try:
+            d = tomllib.load(open(p, "rb"))
+        except Exception as e:
+            print(f"⚠️  TOML parse failed: {p}: {e}", file=sys.stderr)
+            continue
+        for n in d.get("nodes", []):
+            if n.get("kind") == "function":
                 funcs.append(n)
     return funcs
 
@@ -113,7 +137,7 @@ def main():
     for n in funcs:
         path = n["path"]  # agent/skill_commands.py:138
         py_rel, lineno = path.split(":")
-        py_path = ROOT / py_rel
+        py_path = PROJECT_ROOT / py_rel
         if not py_path.exists():
             print(f"⚠️  文件不存在: {py_rel}\n")
             continue
