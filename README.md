@@ -31,7 +31,7 @@ constraints, decisions, invariants — the "why" of the code.
 
 ```bash
 # Add the marketplace (one-time)
-claude plugin marketplace add https://github.com/zhengxu/axgraph
+claude plugin marketplace add https://github.com/notfresh/axgraph
 
 # Install the plugin
 claude plugin install axgraph@axgraph
@@ -41,15 +41,15 @@ claude plugin install axgraph@axgraph
 
 ```bash
 # Direct from GitHub
-kimi plugin install https://github.com/zhengxu/axgraph
+kimi plugin install https://github.com/notfresh/axgraph
 # Pin a tag:
-kimi plugin install https://github.com/zhengxu/axgraph/tree/v0.1.0
+kimi plugin install https://github.com/notfresh/axgraph/tree/v0.1.0
 ```
 
 ### Standalone CLI (no agent)
 
 ```bash
-git clone https://github.com/zhengxu/axgraph
+git clone https://github.com/notfresh/axgraph
 export PATH="$PWD/axgraph/bin:$PATH"
 ax --help
 ```

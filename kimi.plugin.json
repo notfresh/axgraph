@@ -14,7 +14,7 @@
     "manual-graph",
     "developer-tools"
   ],
-  "homepage": "https://github.com/zhengxu/axgraph",
+  "homepage": "https://github.com/notfresh/axgraph",
   "skills": "./skills/",
   "commands": "./commands/",
   "sessionStart": {
@@ -25,6 +25,6 @@
     "shortDescription": "Layered source-code graph (TOML) for any project",
     "longDescription": "Build, query, and diagnose a layered source-code graph stored in .axgraph/ inside each project. Manual-graph discipline: humans author [[nodes]]/[[edges]], AI assists with validation and AST extraction.",
     "developerName": "郑旭",
-    "websiteURL": "https://github.com/zhengxu/axgraph"
+    "websiteURL": "https://github.com/notfresh/axgraph"
   }
 }

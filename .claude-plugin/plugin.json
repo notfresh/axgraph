@@ -15,8 +15,8 @@
     "manual-graph",
     "developer-tools"
   ],
-  "homepage": "https://github.com/zhengxu/axgraph",
-  "repository": "https://github.com/zhengxu/axgraph",
+  "homepage": "https://github.com/notfresh/axgraph",
+  "repository": "https://github.com/notfresh/axgraph",
   "skills": "./skills/",
   "commands": "./commands/",
   "hooks": "./hooks/hooks.json"
