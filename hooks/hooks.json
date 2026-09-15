@@ -1,0 +1,10 @@
+{
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "matcher": "*",
+      "command": "node ./hooks/session-start.mjs",
+      "timeout": 5
+    }
+  ]
+}
