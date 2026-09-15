@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+"""
+ax — AX-GRAPH CLI wrapper
+
+Resolves the plugin root at runtime (whether installed via Claude Code marketplace,
+Kimi Code /plugins install, or invoked directly), then forwards subcommands to
+lib/graph_query.py (and friends) without forcing callers to know the install path.
+
+Subcommands:
+    ax init     Initialize .axgraph/ in the current project root
+    ax query    Query a node or list bases (forwards to graph_query.py)
+    ax purity   Function purity analysis (forwards to purity.py)
+    ax diagnose Feature-chain diagnosis (forwards to diagnose.py)
+    ax update   Update a node (forwards to graph_query.py --update)
+    ax extract  Extract CALLS candidates from a Python file (call_candidates.py)
+    ax --help   Show this help
+
+The wrapper intentionally does NOT shell out to a subprocess when avoidable —
+direct imports are 5x faster and avoid the "script not found after install" class
+of bugs. We still respect $AX_GRAPH_PYTHON (defaults to /usr/bin/env python3) so
+users with venv quirks can override.
+
+Resolution order for plugin root:
+    1. $AX_GRAPH_ROOT (explicit override)
+    2. Walk up from this file: .../axgraph/bin/ax  →  ../  is the plugin root
+    3. Hard fail with a clear message
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import os
+import sys
+from pathlib import Path
+
+
+def _resolve_plugin_root() -> Path:
+    """Find the axgraph plugin root regardless of how `ax` was invoked."""
+    override = os.environ.get("AX_GRAPH_ROOT")
+    if override:
+        root = Path(override).expanduser().resolve()
+        if not (root / "lib" / "graph_query.py").exists():
+            sys.exit(
+                f"ax: AX_GRAPH_ROOT={root} does not look like an axgraph plugin "
+                f"(missing lib/graph_query.py)."
+            )
+        return root
+
+    here = Path(__file__).resolve().parent
+    # Walk up at most 3 levels to handle symlinked PATH installs (common on macOS/Linux)
+    for candidate in (here, here.parent, here.parent.parent):
+        if (candidate / "lib" / "graph_query.py").exists():
+            return candidate
+
+    sys.exit(
+        f"ax: cannot locate axgraph plugin root from {here}. "
+        f"Set $AX_GRAPH_ROOT to the plugin install directory."
+    )
+
+
+def _load_module(root: Path, module_file: str, module_name: str):
+    """Import a lib/*.py file as a real Python module so we can call main() directly."""
+    path = root / "lib" / module_file
+    if not path.exists():
+        sys.exit(f"ax: missing {path} (plugin install is broken?)")
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        sys.exit(f"ax: cannot import {path}")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="ax",
+        description="AX-GRAPH — layered source-code graph for any project (Claude Code / Kimi Code plugin).",
+    )
+    p.add_argument("--root", help="Override plugin root (default: auto-detect from this script's location).")
+    p.add_argument("--version", action="store_true", help="Show plugin version and exit.")
+    sub = p.add_subparsers(dest="cmd", metavar="<subcommand>")
+
+    # init — special: does NOT need an existing .axgraph/, creates one
+    init_p = sub.add_parser("init", help="Initialize .axgraph/ in the current project (interactive).")
+    init_p.add_argument("--project-root", default=".", help="Project root (default: cwd).")
+    init_p.add_argument("--type", choices=["dir", "file"], default="dir",
+                        help="Graph type — 'dir' for whole-project graph, 'file' for single-file AST graph.")
+    init_p.add_argument("--source", help="Source path for --type=file (relative to project root).")
+
+    # query — passthrough to graph_query.py
+    sub.add_parser("query", help="Query a node or list bases (forwards to graph_query.py).")
+    sub.add_parser("purity", help="Function purity analysis (forwards to purity.py).")
+    sub.add_parser("diagnose", help="Feature-chain diagnosis (forwards to diagnose.py).")
+    sub.add_parser("update", help="Update a node (forwards to graph_query.py --update).")
+    sub.add_parser("extract", help="Extract CALLS candidates from a Python file (call_candidates.py).")
+
+    return p
+
+
+def main() -> int:
+    args, forwarded = _build_parser().parse_known_args()
+
+    root = Path(args.root).expanduser().resolve() if args.root else _resolve_plugin_root()
+    if args.version:
+        version_file = root / "VERSION"
+        if version_file.exists():
+            print(version_file.read_text().strip())
+        else:
+            print("ax: version file not present (dev install?)")
+        return 0
+
+    if not args.cmd:
+        # No subcommand → show help
+        _build_parser().print_help()
+        return 0
+
+    if args.cmd == "init":
+        return _cmd_init(root, args)
+
+    # All other subcommands: hand off to the corresponding lib/*.py with forwarded args.
+    target = {
+        "query":   ("graph_query.py",   "ax_graph_query"),
+        "update":  ("graph_query.py",   "ax_graph_query"),
+        "purity":  ("purity.py",        "ax_purity"),
+        "diagnose":("diagnose.py",      "ax_diagnose"),
+        "extract": ("call_candidates.py","ax_call_candidates"),
+    }[args.cmd]
+    mod = _load_module(root, target[0], target[1])
+
+    # The lib/*.py scripts do not accept --project-root; they derive .axgraph/
+    # from the cwd or --base flag. We don't inject anything — the caller is
+    # responsible for cwd or for passing --base explicitly.
+    sys.argv = [f"ax {args.cmd}"] + forwarded
+    if hasattr(mod, "main"):
+        return mod.main()
+    if hasattr(mod, "cli"):
+        return mod.cli()
+    # Fallback: execute as script (re-run with argv)
+    sys.exit(mod.__name__)
+
+
+def _cmd_init(root: Path, args: argparse.Namespace) -> int:
+    """Scaffold .axgraph/ inside a target project. This is the one subcommand we
+    implement here (rather than forwarding) because it's the onboarding entrypoint
+    and needs to know about the plugin's own copy of SCHEMA.md / AGENTS.md."""
+    import shutil
+
+    project_root = Path(args.project_root).expanduser().resolve()
+    if not project_root.is_dir():
+        sys.exit(f"ax init: project root {project_root} is not a directory.")
+    axgraph_dir = project_root / ".axgraph"
+    if axgraph_dir.exists():
+        print(f"ax init: {axgraph_dir} already exists — nothing to do.")
+        print(f"       run `ax query --bases` inside the project to inspect.")
+        return 0
+
+    # Scaffold: copy docs/SCHEMA.md + docs/AGENTS.md into .axgraph/ so the user
+    # has the editing manual right next to their graph. We do NOT copy every doc —
+    # the rest stays in the plugin's docs/ and the user can browse via `ax --help`.
+    axgraph_dir.mkdir()
+    for doc in ("SCHEMA.md", "AGENTS.md", "README.md"):
+        src = root / "docs" / doc
+        if src.exists():
+            shutil.copy2(src, axgraph_dir / doc)
+
+    # Initialize either a dir-graph or a file-graph base
+    if args.type == "dir":
+        base_name = project_root.name
+        base_dir = axgraph_dir / f"base-dir-{base_name}"
+        base_dir.mkdir()
+        # Create empty Layer-1/2 TOMLs and a base.toml manifest
+        (base_dir / "base.toml").write_text(
+            f'[graph]\nname = "{base_name}"\nlayer = "1"\ngranularity = "module+file"\n'
+            f'created = "{_today_iso()}"\nschema = "axgraph-1.0"\nnote = "auto-init via ax init"\n\n'
+            f'[source]\npath = "."\nrepo = "{project_root}"\ntype = "dir"\n'
+        )
+        (base_dir / "Layer-1-Graph.toml").write_text(
+            "# Layer 1: module/file distribution. See SCHEMA.md for node/edge format.\n"
+            "# Add nodes like:\n#   [[nodes]]\n#   id = \"mod.<name>\"\n#   kind = \"module\"\n#   path = \"<path>\"\n#   layer = \"core\"\n#   desc = \"...\"\n"
+        )
+        (base_dir / "Layer-2-Graph.toml").write_text(
+            "# Layer 2: implicit clusters (named pattern + dependency cohesion).\n"
+            "# See SCHEMA.md for cluster vs subpackage semantics.\n"
+        )
+        print(f"ax init: created dir-graph base → {base_dir}")
+    else:
+        # File-graph: needs --source
+        if not args.source:
+            sys.exit("ax init: --source <file> is required when --type=file.")
+        source = (project_root / args.source).resolve()
+        if not source.is_file():
+            sys.exit(f"ax init: source file {source} does not exist.")
+        base_name = source.stem
+        base_dir = axgraph_dir / f"base-file-{base_name}"
+        base_dir.mkdir()
+        (base_dir / "base.toml").write_text(
+            f'[graph]\nname = "{base_name}"\nlayer = "1"\ngranularity = "function"\n'
+            f'created = "{_today_iso()}"\nschema = "axgraph-1.0"\nnote = "auto-init via ax init (file mode)"\n\n'
+            f'[source]\npath = "{args.source}"\nrepo = "{project_root}"\ntype = "file"\n'
+        )
+        print(f"ax init: created file-graph base → {base_dir}")
+        print(f"         next: ax graph_query.py (AST seed) — see docs/How-to-update-graph.md")
+
+    print()
+    print("Next steps:")
+    print(f"  cd {project_root}")
+    print("  ax query --bases              # verify base is registered")
+    print(f"  cat .axgraph/SCHEMA.md        # editing manual for [[nodes]] / [[edges]]")
+    print(f"  cat .axgraph/AGENTS.md        # collaboration iron rules")
+    return 0
+
+
+def _today_iso() -> str:
+    from datetime import date
+    return date.today().isoformat()
+
+
+if __name__ == "__main__":
+    sys.exit(main() or 0)

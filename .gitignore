@@ -1,0 +1,18 @@
+# .axgraph — per-project graph data (DO NOT COMMIT GRAPH STATE, ONLY CONFIG TEMPLATES)
+# Decision rationale: see docs/AGENTS.md §1 (manual-graph discipline).
+# If you DO want to commit graph state for a project, force-add specific files.
+
+# Python tool caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Editor / OS
+.DS_Store
+.vscode/
+*.swp
+*.swo
+
+# Plugin install artifacts (none expected, but defensive)
+.installed.json
