@@ -90,6 +90,12 @@ ax query mod.agent -c -r
 
 These are documented individually in `commands/`.
 
+## Requirements
+
+- **Python 3.10+** (3.11+ recommended). On 3.10, run `pip install tomli` (graph_query.py / call_candidates.py auto-fall-back; the plugin declares this in both manifests).
+- **Node.js 18+** for the SessionStart hook (Claude Code path only; Kimi Code uses the declarative `sessionStart.skill` and does not need Node).
+- No other runtime dependencies.
+
 ## What this is NOT
 
 - **Not an auto-builder.** No tree-sitter, no MCP server, no SQLite. The

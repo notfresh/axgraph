@@ -13,8 +13,17 @@
       → 调用 zzz [链路内 ✓ / 链路外]  (来源: import 映射)
 """
 import ast
-import tomllib
 import sys
+try:
+    import tomllib  # Python 3.11+ stdlib
+except ImportError:  # pragma: no cover
+    try:
+        import tomli as tomllib  # 3.10 backport
+    except ImportError:
+        sys.exit(
+            "call_candidates.py: Python 3.10 detected and `tomli` is not installed.\n"
+            "Fix: `pip install tomli`   (or upgrade to Python 3.11+)."
+        )
 from pathlib import Path
 
 ROOT = Path("/root/projects/hermes-agent-plus")

@@ -16,7 +16,16 @@
 """
 import sys
 import re
-import tomllib
+try:
+    import tomllib  # Python 3.11+ stdlib
+except ImportError:  # pragma: no cover
+    try:
+        import tomli as tomllib  # 3.10 backport: `pip install tomli`
+    except ImportError:
+        sys.exit(
+            "graph_query.py: Python 3.10 detected and `tomli` is not installed.\n"
+            "Fix: `pip install tomli`   (or upgrade to Python 3.11+)."
+        )
 import difflib
 import argparse
 from pathlib import Path

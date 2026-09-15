@@ -1,0 +1,2 @@
+# Layer 2: implicit clusters (named pattern + dependency cohesion).
+# See SCHEMA.md for cluster vs subpackage semantics.

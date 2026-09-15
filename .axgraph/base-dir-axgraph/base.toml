@@ -1,0 +1,12 @@
+[graph]
+name = "axgraph"
+layer = "1"
+granularity = "module+file"
+created = "2026-09-15"
+schema = "axgraph-1.0"
+note = "auto-init via ax init"
+
+[source]
+path = "."
+repo = "/root/projects/axgraph"
+type = "dir"
