@@ -156,11 +156,16 @@ def _cmd_init(root: Path, args: argparse.Namespace) -> int:
         print(f"       run `ax query --bases` inside the project to inspect.")
         return 0
 
-    # Scaffold: copy docs/SCHEMA.md + docs/AGENTS.md into .axgraph/ so the user
-    # has the editing manual right next to their graph. We do NOT copy every doc —
-    # the rest stays in the plugin's docs/ and the user can browse via `ax --help`.
+    # Scaffold: copy docs/SCHEMA.md into .axgraph/ so the user has the editing
+    # manual right next to their graph. We deliberately do NOT copy README.md
+    # (it's the axgraph-plugin self-description, irrelevant once the user has
+    # decided to install), AGENTS.md (project-internal collaboration rules,
+    # already covered by the injected SKILL.md), or How-to-update-graph.md
+    # (advanced maintenance doc, the user can `cat` from the axgraph install
+    # dir when needed). Keep .axgraph/ minimal — the graph itself is the
+    # artifact; reference docs stay in the plugin's docs/.
     axgraph_dir.mkdir()
-    for doc in ("SCHEMA.md", "AGENTS.md", "README.md"):
+    for doc in ("SCHEMA.md",):
         src = root / "docs" / doc
         if src.exists():
             shutil.copy2(src, axgraph_dir / doc)
@@ -208,7 +213,9 @@ def _cmd_init(root: Path, args: argparse.Namespace) -> int:
     print(f"  cd {project_root}")
     print("  ax query --bases              # verify base is registered")
     print(f"  cat .axgraph/SCHEMA.md        # editing manual for [[nodes]] / [[edges]]")
-    print(f"  cat .axgraph/AGENTS.md        # collaboration iron rules")
+    print(f"  # Other references stay in the axgraph plugin:")
+    print(f"  #   docs/AGENTS.md           (collaboration rules — also in injected SKILL.md)")
+    print(f"  #   docs/How-to-update-graph.md (line-number drift handling)")
     return 0
 
 
