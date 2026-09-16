@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "description": "Build layered source-code graphs (TOML) for any project — query, validate, diagnose. Manual-graph discipline: humans in the loop, AI as accelerator.",
   "author": {
-    "name": "郑旭",
-    "email": "support@anthropic.com"
+    "name": "notfresh@github",
+    "email": "notfresh@foxmail.com"
   },
   "license": "MIT",
   "keywords": [

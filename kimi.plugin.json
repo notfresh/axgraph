@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Build layered source-code graphs (TOML) for any project — query, validate, diagnose. Manual-graph discipline: humans in the loop, AI as accelerator.",
   "author": {
-    "name": "郑旭"
+    "name": "notfresh@github"
   },
   "license": "MIT",
   "keywords": [
@@ -36,7 +36,7 @@
     "displayName": "AX-GRAPH",
     "shortDescription": "Layered source-code graph (TOML) for any project",
     "longDescription": "Build, query, and diagnose a layered source-code graph stored in .axgraph/ inside each project. Manual-graph discipline: humans author [[nodes]]/[[edges]], AI assists with validation and AST extraction.",
-    "developerName": "郑旭",
+    "developerName": "notfresh@github",
     "websiteURL": "https://github.com/notfresh/axgraph"
   }
 }
