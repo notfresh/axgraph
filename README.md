@@ -48,9 +48,9 @@ kimi plugin install https://github.com/notfresh/axgraph/tree/v0.1.0
 
 ### Standalone CLI (no agent)
 
-The wrapper needs `bin/ax` on your PATH. Two options:
+If you cloned axgraph from GitHub directly (not via a host installer like Kimi Code / Claude Code), you need `bin/ax` on your PATH. Two options:
 
-**pip-install style (recommended)** — symlink once, use forever:
+**pip-install style (recommended for standalone)** — symlink once, use forever:
 
 ```bash
 git clone https://github.com/notfresh/axgraph
@@ -73,6 +73,32 @@ ax --help
 ```
 
 To make it permanent: add the `export PATH=...` line to `~/.bashrc` (or your shell's rc file).
+
+### Installed via Kimi Code / Claude Code — `ax` in your shell?
+
+**Short answer: probably not automatically.** Both Kimi Code and Claude Code
+install plugins into host-managed directories
+(`$KIMI_CODE_HOME/plugins/managed/<id>/` / `~/.claude/plugins/<id>/`) that are
+**not** on your shell `$PATH`. The host can call `ax` internally (because the
+host knows the plugin's install path), but your shell can't — typing `ax` in
+a new terminal returns `command not found`.
+
+This is a host-protocol limitation: neither host's plugin manifest schema
+declares plugin-shipped CLI binaries (Kimi's `kimi.plugin.json` schema has
+skills / commands / sessionStart / mcpServers / hooks but no "executablePath";
+Claude Code's `plugin.json` is the same). Without a manifest field, hosts
+have no way to know they should add the plugin's `bin/` to the user's PATH.
+
+**Workarounds:**
+
+1. **Let the host invoke it.** In a Kimi / Claude Code session, ask the model
+   to run `ax query --bases` — the host resolves the plugin path and runs it.
+   Don't expect `ax` from your shell.
+2. **Re-install standalone for shell use.** `git clone` + `./install.sh`
+   above. The standalone copy doesn't conflict with the host's copy.
+3. **Manually export PATH** to the host's plugin dir (path varies; on Kimi
+   run `kimi plugins info axgraph` to find the managed path; on Claude Code
+   check `~/.claude/plugins/axgraph/bin/`).
 
 ## Quick start (inside any project)
 
