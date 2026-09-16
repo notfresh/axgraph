@@ -58,6 +58,14 @@ ax extract <file.py>             # AST extract CALLS candidates (paste into TOML
 ax --help                        # Show all subcommands
 ```
 
+When running inside Claude Code / Kimi Code, slash command equivalents are
+registered by the plugin: `/axgraph:install` (symlink `~/.local/bin/ax` so
+`ax` works in your shell), `/axgraph:init`, `/axgraph:query`,
+`/axgraph:purity`, `/axgraph:diagnose`. The slash form is preferred when
+the user is in the host — the host resolves the plugin path automatically;
+the bare `ax` form needs `~/.local/bin` on PATH (use `/axgraph:install`
+once to set that up).
+
 ## Mandatory Workflow
 
 ### When the user asks about ANY project's structure
