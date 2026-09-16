@@ -30,21 +30,45 @@ constraints, decisions, invariants — the "why" of the code.
 ### Claude Code (Anthropic)
 
 ```bash
-# Add the marketplace (one-time)
+# Add the marketplace (one-time) — pins to the marketplace.json default branch
 claude plugin marketplace add https://github.com/notfresh/axgraph
 
 # Install the plugin
 claude plugin install axgraph@axgraph
 ```
 
+Claude Code's marketplace fetches `marketplace.json` from the default
+branch (no tag pinning in this flow). For pinned installs, users can
+clone the repo at a specific tag/commit and add the local path as a
+marketplace instead. See [RELEASING.md](RELEASING.md) for the maintainer's
+side.
+
 ### Kimi Code (Moonshot)
 
+Kimi Code supports 4 URL forms. **For production use, pin a tag** so your
+users don't get auto-upgraded when you push to master:
+
 ```bash
-# Direct from GitHub
+# Pin to a specific release (recommended for stable installs)
+kimi plugin install https://github.com/notfresh/axgraph/releases/tag/v0.1.0
+
+# Pin to a commit SHA (for reproducibility)
+kimi plugin install https://github.com/notfresh/axgraph/commit/<sha>
+
+# Latest release (auto-upgrades when you ship a new release)
 kimi plugin install https://github.com/notfresh/axgraph
-# Pin a tag:
-kimi plugin install https://github.com/notfresh/axgraph/tree/v0.1.0
+
+# Default branch head (development — not recommended for users)
+kimi plugin install https://github.com/notfresh/axgraph/tree/master
 ```
+
+Pin-to-tag users get **no update prompt** when you push to master — they
+have to explicitly reinstall to upgrade. This is the right default for
+teams that want change control.
+
+See [RELEASING.md](RELEASING.md) for the maintainer's side: how to ship a
+new version, what to bump, why `gh release create` matters, and the
+managed-copy gotcha.
 
 ### Standalone CLI (no agent)
 
@@ -175,6 +199,7 @@ Both also accept a `--data-dir` flag on the relevant subcommand.
 | [docs/usage-skill-load.md](docs/usage-skill-load.md) | Worked example: skill-load feature |
 | [docs/TODO.md](docs/TODO.md) | Future plans |
 | [docs/RELEASE.md](docs/RELEASE.md) | Version history |
+| [RELEASING.md](RELEASING.md) | Maintainer guide: how to ship a new version |
 
 ## Plugin layout
 
