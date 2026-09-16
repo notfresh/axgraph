@@ -99,8 +99,72 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
+_KNOWN_CMDS = {"init", "query", "purity", "diagnose", "update", "extract"}
+_WRAPPER_FLAGS_WITH_VALUE = {"--root"}
+
+
+def _split_unknown_subcommand(raw):
+    """把 ax 后的 argv 切成 (pre, query_default, rest)。
+
+    pre           : wrapper 自己的 flag + value（保留给 argparse 处理）
+    query_default : 如果第一个非 wrapper 位置参数不是已知子命令，这里返回它；
+                    否则 None（让 argparse 正常选子命令）
+    rest          : 第一个非 wrapper 位置参数之后的所有东西
+
+    例：
+        ['mod.agent', '-c', '-r']              → ([], 'mod.agent', ['-c','-r'])
+        ['--root', '/p', 'mod.agent']          → (['--root','/p'], 'mod.agent', [])
+        ['query', 'mod.agent']                 → ([], None, [])    # 让 argparse 走 query
+        ['--root', '/p', 'init']               → (['--root','/p'], None, [])
+        ['init', '--project-root', '/p']       → ([], None, [])    # 让 argparse 走 init
+    """
+    i = 0
+    while i < len(raw):
+        a = raw[i]
+        if a in _WRAPPER_FLAGS_WITH_VALUE and i + 1 < len(raw):
+            i += 2
+            continue
+        if a.startswith("--") and "=" not in a:
+            # 未知 wrapper flag：当作不需要 value，跳过（保守处理）
+            i += 1
+            continue
+        break
+    pre = raw[:i]
+    rest = raw[i:]
+    if not rest:
+        return pre, None, []
+    first = rest[0]
+    if first in _KNOWN_CMDS:
+        return pre, None, []
+    return pre, first, rest[1:]
+
+
 def main() -> int:
+    # ax wrapper 自己的参数（先于子命令解析）
+    WRAPPER_FLAGS = {"--root", "--version", "-h", "--help"}
+
+    # 如果用户在 ax 后面直接跟非子命令的位置参数（如 ax mod.agent），
+    # 把第一个未知位置参数当作 query 的目标，剩下的作 forwarded。
+    # 这样 'ax mod.agent -c -r' 等价于 'ax query mod.agent -c -r'。
+    # 跳过 wrapper 自己的 flag 和它们的 value。
+    raw = sys.argv[1:]
+    pre, query_default, rest = _split_unknown_subcommand(raw)
+
+    if query_default is not None:
+        # 把 [pre..., "query", query_default, rest...] 交给 argparse
+        sys.argv = [sys.argv[0]] + pre + ["query", query_default] + rest
+    else:
+        sys.argv = sys.argv[:1] + raw
+
     args, forwarded = _build_parser().parse_known_args()
+
+    # 处理 query_default 已被 'query' 子命令吃进去的情况：
+    # 如果 cmd == "query" 且 forwarded 里没有查询关键词，把 query_default 加回去
+    if query_default is not None and not forwarded:
+        forwarded = [query_default] + rest
+
+    # 处理 '--' 透传边界：argparse.REMAINDER 不够用，手动恢复 forwarded
+    # argparse parse_known_args 已经把未知 flag 留到 forwarded，正常。
 
     root = Path(args.root).expanduser().resolve() if args.root else _resolve_plugin_root()
     if args.version:
