@@ -96,6 +96,15 @@ These are documented individually in `commands/`.
 - **Node.js 18+** for the SessionStart hook (Claude Code path only; Kimi Code uses the declarative `sessionStart.skill` and does not need Node).
 - No other runtime dependencies.
 
+## Environment variables
+
+| Variable | Used by | Default | Effect |
+|---|---|---|---|
+| `AX_GRAPH_DATA_DIR` | lib/graph_query.py | cwd or cwd/.axgraph | Override the data directory (where base-* subdirs live). Useful when running tools outside a project root. |
+| `AX_GRAPH_PROJECT_ROOT` | lib/call_candidates.py | cwd or cwd/.axgraph parent | Override the project root (where the source code under analysis lives). Distinct from `AX_GRAPH_DATA_DIR`: one is the graph data, the other is the code being graphed. |
+
+Both also accept a `--data-dir` flag on the relevant subcommand.
+
 ## What this is NOT
 
 - **Not an auto-builder.** No tree-sitter, no MCP server, no SQLite. The

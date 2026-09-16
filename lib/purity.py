@@ -44,7 +44,8 @@ def _load_file(path: str):
             from graph_query import get_repo
             p = get_repo() / p
         except ImportError:
-            p = Path(__file__).parent.parent / p
+            # graph_query 也导入失败（极端开发态）：兜底 cwd
+            p = Path.cwd() / p
     if not p.exists():
         return None
     return p.read_text(encoding="utf-8")
@@ -377,6 +378,7 @@ def purity_file_main(filepath: str, func_name: str = None) -> int:
     except ImportError:
         p = Path(filepath)
         if not p.is_absolute():
+            # 兜底顺序：cwd / graph_query 父目录 / purity.py 自身父目录
             for cand in (Path.cwd() / p, Path(__file__).parent / p):
                 if cand.exists():
                     p = cand

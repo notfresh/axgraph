@@ -27,12 +27,26 @@ except ImportError:  # pragma: no cover
         )
 from pathlib import Path
 
+
+def _find_project_root() -> str:
+    """上溯 cwd 直到找到 .axgraph/ 的父目录（即被分析项目根）。"""
+    cur = Path.cwd().resolve()
+    while cur != cur.parent:
+        if (cur / ".axgraph").is_dir():
+            return str(cur)
+        cur = cur.parent
+    return ""
+
+
 # 被分析的源码根（不是 axgraph 插件根）。优先顺序：
-#   1. 命令行 --project-root
-#   2. 环境变量 AX_GRAPH_PROJECT_ROOT
+#   1. 环境变量 AX_GRAPH_PROJECT_ROOT
+#   2. cwd 上溯找到 .axgraph/ 的父目录（兼容 bin/ax 转发时 cwd 已在 .axgraph/）
 #   3. 当前工作目录
-# 这样 init 后的任意项目里跑 `ax extract` 都能找到自己的源码树。
-PROJECT_ROOT = Path(os.environ.get("AX_GRAPH_PROJECT_ROOT", ".")).resolve()
+PROJECT_ROOT = Path(
+    os.environ.get("AX_GRAPH_PROJECT_ROOT")
+    or _find_project_root()
+    or "."
+).resolve()
 
 
 def load_func_nodes(base_dir: Path = None):

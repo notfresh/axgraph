@@ -119,20 +119,49 @@ def main() -> int:
     if args.cmd == "init":
         return _cmd_init(root, args)
 
-    # All other subcommands: hand off to the corresponding lib/*.py with forwarded args.
+    # 其他子命令：cd 进数据目录（被分析项目的 .axgraph/），让老 lib 工具
+    # （graph_query / diagnose / purity）的 BASE 解析能找到 base-* 目录。
+    # 优先级：
+    #   1. cwd 已经在 .axgraph/ 内（用户手动 cd 进去）→ 保持 cwd
+    #   2. cwd 的 .axgraph/ 存在 → cd 进去
+    #   3. env AX_GRAPH_DATA_DIR → cd 进去
+    #   4. 都没有 → 保持 cwd（让 lib 工具自己报"找不到 base"）
+    cwd = Path.cwd()
+    data_dir = None
+    if cwd.name == ".axgraph":
+        data_dir = cwd
+    elif (cwd / ".axgraph").is_dir():
+        data_dir = cwd / ".axgraph"
+    elif os.environ.get("AX_GRAPH_DATA_DIR"):
+        data_dir = Path(os.environ["AX_GRAPH_DATA_DIR"])
+
+    original_cwd = None
+    if data_dir is not None and data_dir.resolve() != cwd.resolve():
+        original_cwd = cwd
+        os.chdir(data_dir)
+
+    try:
+        return _forward_to_lib(root, args.cmd, forwarded)
+    finally:
+        if original_cwd is not None:
+            os.chdir(original_cwd)
+
+
+def _forward_to_lib(root: Path, cmd: str, forwarded: list) -> int:
+    """Hand off to the corresponding lib/*.py with forwarded args."""
     target = {
         "query":   ("graph_query.py",   "ax_graph_query"),
         "update":  ("graph_query.py",   "ax_graph_query"),
         "purity":  ("purity.py",        "ax_purity"),
         "diagnose":("diagnose.py",      "ax_diagnose"),
         "extract": ("call_candidates.py","ax_call_candidates"),
-    }[args.cmd]
+    }[cmd]
     mod = _load_module(root, target[0], target[1])
 
     # The lib/*.py scripts do not accept --project-root; they derive .axgraph/
     # from the cwd or --base flag. We don't inject anything — the caller is
     # responsible for cwd or for passing --base explicitly.
-    sys.argv = [f"ax {args.cmd}"] + forwarded
+    sys.argv = [f"ax {cmd}"] + forwarded
     if hasattr(mod, "main"):
         return mod.main()
     if hasattr(mod, "cli"):

@@ -28,9 +28,57 @@ except ImportError:  # pragma: no cover
         )
 import difflib
 import argparse
+import os
 from pathlib import Path
 
-BASE = Path(__file__).parent
+
+def _resolve_data_dir() -> Path:
+    """axgraph 通用化后的数据目录解析。
+
+    优先级：
+        1. 命令行 --data-dir（如果有）
+        2. 环境变量 AX_GRAPH_DATA_DIR
+        3. 当前工作目录下的 .axgraph/
+        4. .active-base 在 cwd 上一层（向后兼容老 axgraph 仓库内 base 布局）
+
+    返回 Path（不一定存在；调用方决定怎么处理）。
+    """
+    explicit = os.environ.get("AX_GRAPH_DATA_DIR")
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    # 当前 cwd 已经在 .axgraph/ 内（用户手动 cd 进去或 bin/ax 自动切）→ 直接用
+    if Path.cwd().name == ".axgraph":
+        return Path.cwd().resolve()
+    # cwd 下有 .axgraph/ 子目录 → 用它
+    cwd_axgraph = Path.cwd() / ".axgraph"
+    if cwd_axgraph.is_dir():
+        return cwd_axgraph.resolve()
+    # 向后兼容：在 axgraph 仓库内（老 ax init 不带 .axgraph/ 子目录布局），
+    # 工具仍能在 lib/ 的同级找 base-*。这是开发态兼容，不影响分发。
+    legacy = Path(__file__).parent
+    if any(legacy.glob("base-*")):
+        return legacy
+    # 都没有：返回 cwd/.axgraph（让 init 创建）
+    return cwd_axgraph
+
+
+def _set_data_dir_from_argv() -> None:
+    """拦截 sys.argv 里的 --data-dir，写入 AX_GRAPH_DATA_DIR 在 BASE 求值前生效。
+
+    这是个小 hack —— 因为 BASE 在 import 期就被求值，但 argparse 还没跑。
+    """
+    args = sys.argv[1:]
+    for i, a in enumerate(args):
+        if a == "--data-dir" and i + 1 < len(args):
+            os.environ["AX_GRAPH_DATA_DIR"] = args[i + 1]
+            return
+        if a.startswith("--data-dir="):
+            os.environ["AX_GRAPH_DATA_DIR"] = a.split("=", 1)[1]
+            return
+
+
+_set_data_dir_from_argv()
+BASE = _resolve_data_dir()
 ACTIVE_FILE = BASE / ".active-base"
 ARCH_LAYERS = {"core", "interface", "capability", "application", "entry", "infra"}
 VALID_KINDS = {
@@ -48,14 +96,20 @@ VALID_RELS = {
 # ── base 管理（多库体系，类似 select database）──
 
 def get_active_base() -> str:
-    """当前默认 base（.active-base 记录，缺省 base-dir-hermes_agent）。"""
+    """当前默认 base（.active-base 记录，缺省取 BASE 下第一个 base-* 子目录）。"""
     try:
         name = ACTIVE_FILE.read_text(encoding="utf-8").strip()
         if name and (BASE / name).is_dir():
             return name
     except Exception:
         pass
-    return "base-dir-hermes_agent"
+    # 兜底：BASE 下第一个 base-* 目录。新 init 的项目没有 .active-base 时
+    # 自然落到这里；老 axgraph 仓库内的 base-dir-hermes_agent 也兼容（BASE
+    # 此时指向 lib/ 的父目录）。
+    candidates = sorted(BASE.glob("base-*"))
+    if candidates:
+        return candidates[0].name
+    return ""
 
 
 def set_active_base(name: str) -> None:
@@ -81,13 +135,28 @@ def get_base_meta(name: str = None) -> dict:
         except Exception:
             pass
     if not meta.get("repo"):
-        meta["repo"] = str(Path(__file__).parent.parent)
+        # base.toml 里没写 repo 时的兜底：
+        # - 如果 BASE 在某个项目下的 .axgraph/ 里，repo 就是 BASE 的父目录
+        # - 否则（开发态：BASE 是 axgraph 插件 lib/），repo 是 axgraph 仓库根
+        if BASE.name == ".axgraph":
+            meta["repo"] = str(BASE.parent)
+        else:
+            meta["repo"] = str(BASE.parent)
     return meta
 
 
 def get_repo(name: str = None) -> Path:
     """当前 base 的仓库根（节点 path 相对它解析）。"""
-    return Path(get_base_meta(name).get("repo", str(Path(__file__).parent.parent)))
+    if name:
+        meta = get_base_meta(name)
+        if meta.get("repo"):
+            return Path(meta["repo"])
+    # 未指定 name 时：当前活跃 base 的 repo
+    meta = get_base_meta(get_active_base())
+    if meta.get("repo"):
+        return Path(meta["repo"])
+    # 兜底：BASE 的父目录（被分析项目根，或开发态 axgraph 仓库根）
+    return BASE.parent
 
 
 def list_bases() -> list:
@@ -121,13 +190,17 @@ def load(layer_num=None):
         files = [p for p in files if p.name.startswith(f"Layer-{layer_num}-Graph")]
     for p in files:
         with open(p, "rb") as f:
-            d = tomllib.load(f)
-        for n in d["nodes"]:
+            try:
+                d = tomllib.load(f)
+            except Exception as exc:
+                print(f"⚠️  TOML 解析失败 {p}: {exc}", file=sys.stderr)
+                continue
+        for n in d.get("nodes", []):
             n["source"] = p.name
-        for e in d["edges"]:
+        for e in d.get("edges", []):
             e["source"] = p.name
-        data["nodes"].extend(d["nodes"])
-        data["edges"].extend(d["edges"])
+        data["nodes"].extend(d.get("nodes", []))
+        data["edges"].extend(d.get("edges", []))
     return data
 
 
@@ -724,6 +797,7 @@ def main():
     parser.add_argument("--base", help="切换并查询指定 base（同时设为默认，写入 .active-base）")
     parser.add_argument("--bases", action="store_true", help="列出全部 base（当前默认打 *）")
     parser.add_argument("--new-base", nargs=2, metavar=("TYPE", "PATH"), help="新建 base：dir <项目路径> | file <源码文件>")
+    parser.add_argument("--data-dir", help="覆盖数据目录（默认从 cwd 推断）。也可设环境变量 AX_GRAPH_DATA_DIR。")
     args = parser.parse_args()
 
     # base 管理：--bases / --new-base / --base 优先处理（切换后影响后续所有加载）
