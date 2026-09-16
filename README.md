@@ -48,11 +48,31 @@ kimi plugin install https://github.com/notfresh/axgraph/tree/v0.1.0
 
 ### Standalone CLI (no agent)
 
+The wrapper needs `bin/ax` on your PATH. Two options:
+
+**pip-install style (recommended)** — symlink once, use forever:
+
+```bash
+git clone https://github.com/notfresh/axgraph
+cd axgraph
+./install.sh                    # creates ~/.local/bin/ax → axgraph/bin/ax
+ax --version                     # 0.1.0 — works from any cwd
+```
+
+The script checks whether `~/.local/bin` is on your PATH and prints the fix
+(`export PATH=...`) if not. Re-run `./install.sh` after `git pull` to refresh
+the symlink (it remains valid since it points at the file, not at a version
+hash, but running it again is harmless and idempotent).
+
+**Manual PATH** — if you prefer not to symlink:
+
 ```bash
 git clone https://github.com/notfresh/axgraph
 export PATH="$PWD/axgraph/bin:$PATH"
 ax --help
 ```
+
+To make it permanent: add the `export PATH=...` line to `~/.bashrc` (or your shell's rc file).
 
 ## Quick start (inside any project)
 
