@@ -112,9 +112,10 @@ def main() -> int:
         return 0
 
     if not args.cmd:
-        # No subcommand → show help
-        _build_parser().print_help()
-        return 0
+        # 无子命令 = 直接转发到 graph_query.py（最 unix 的行为：ax 是 wrapper，
+        # 无参数时与底层工具完全等价；graph_query.py 自己处理无参 → 列出可查节点）
+        args.cmd = "query"
+        forwarded = []
 
     if args.cmd == "init":
         return _cmd_init(root, args)
