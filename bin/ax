@@ -90,7 +90,8 @@ def _build_parser() -> argparse.ArgumentParser:
     init_p.add_argument("--source", help="Source path for --type=file (relative to project root).")
 
     # query — passthrough to graph_query.py
-    sub.add_parser("query", help="Query a node or list bases (forwards to graph_query.py).")
+    # add_help=False 让 --help/-h 不被子解析器拦截，透传给 graph_query.py
+    sub.add_parser("query", help="Query a node or list bases (forwards to graph_query.py).", add_help=False)
     sub.add_parser("purity", help="Function purity analysis (forwards to purity.py).")
     sub.add_parser("diagnose", help="Feature-chain diagnosis (forwards to diagnose.py).")
     sub.add_parser("update", help="Update a node (forwards to graph_query.py --update).")
@@ -165,6 +166,10 @@ def main() -> int:
 
     # 处理 '--' 透传边界：argparse.REMAINDER 不够用，手动恢复 forwarded
     # argparse parse_known_args 已经把未知 flag 留到 forwarded，正常。
+
+    # 处理 ax query --help / -h：透传给 graph_query.py 显示完整帮助
+    if args.cmd == "query" and ("--help" in forwarded or "-h" in forwarded):
+        forwarded = ["--help"]
 
     root = Path(args.root).expanduser().resolve() if args.root else _resolve_plugin_root()
     if args.version:
