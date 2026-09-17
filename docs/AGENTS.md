@@ -16,7 +16,7 @@
 AX-GRAPH/
 ├── graph_query.py / purity.py / SCHEMA.md / AGENTS.md   # 工具+约定，全局共享
 ├── .active-base                        # 默认 base（每次 --base 切换自动更新）
-├── base-dir-<项目名>/                  # 项目图（type=dir）：Layer-*.toml + NodeDetails.toml + base.toml
+├── base-dir-<项目名>/                  # 项目图（type=dir）：Layer-*.toml + Layer-*.detail.toml + base.toml
 └── base-file-<文件名>/                 # 单文件图（type=file）：Layer-1-Graph.toml + base.toml
 ```
 
@@ -29,7 +29,7 @@ AX-GRAPH/
 | `graph_query.py` | 查询 + 校验 + base 管理 + --purity/--file 转发 |
 | `purity.py` | 函数纯度分析（--purity 支线）：L0严格纯/L1工程纯/非纯 + 证据清单；一层调用者传递；只读不写盘 |
 | `SCHEMA.md` | **编辑手册**：节点/边必填字段、命名规则、示例。新增节点前必读 |
-| `NodeDetails.toml` | 节点详细介绍（KV：节点id → 多行读码笔记），由 `-b` 维护（**在 base 目录内**） |
+| `Layer-*.detail.toml` | 节点详细介绍（按 Layer 图分片：节点id → 多行读码笔记），由 `-b` 维护（**在 base 目录内**） |
 | `TODO.md` | **未来规划**：行号漂移的辅助手动更新（--suggest 单点 → 列表 → 全量报告）。改动工具前先看它 |
 | `call_candidates.py` | CALLS 候选提取脚本（AST 提取调用+调用点行号，人工确认后入图） |
 | `usage-skill-load.md` | skill-load 功能链的实战记录（模板参考） |
@@ -83,7 +83,7 @@ python3 graph_query.py --new-base file <文件>  # 新建单文件 base（AST �
 python3 graph_query.py <id> -c                 # 调用链展开（树形 + 调用点行号，可跳转）
 python3 graph_query.py <id> -r                 # 反向调用链（谁在调用我）
 python3 graph_query.py <id> -e                 # 关系人话解读
-python3 graph_query.py <id> -d                 # 末尾显示该节点详细介绍（NodeDetails.toml）
+python3 graph_query.py <id> -d                 # 末尾显示该节点详细介绍（Layer-*.detail.toml）
 python3 graph_query.py --purity <id>           # 函数纯度分析（L0/L1/非纯 + 证据；一层调用者传递；只读不写盘）
 python3 graph_query.py --diagnose <feature_id>   # 功能链诊断（feature.*）：高内聚低耦合判断 + 客观指标 + 证据 + 建议（第一版：内部依赖密度）；只读不写盘
 python3 graph_query.py --diagnose <feature_id> --json  # 输出结构化 JSON（AI/脚本友好）

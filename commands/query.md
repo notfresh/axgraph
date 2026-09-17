@@ -17,7 +17,7 @@ ax query '%skill%'                        # LIKE wildcard on id+path
 ax query <id> -c                          # call-chain expansion (forward)
 ax query <id> -r                          # reverse call chain (callers)
 ax query <id> -e                          # human-readable relation explanation
-ax query <id> -d                          # append NodeDetails.toml description
+ax query <id> -d                          # append Layer-*.detail.toml description
 ax query --validate                       # run full validation across all bases
 ax query --validate -l 3                  # validate only Layer-3 files
 ax query --validate <id>                  # validate one node + its edges

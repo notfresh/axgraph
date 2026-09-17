@@ -412,14 +412,14 @@ def show_callers(nid, data):
 from collections import Counter
 
 
-def details_file() -> Path:
-    """当前 base 的 NodeDetails.toml。"""
-    return base_dir() / "NodeDetails.toml"
+def detail_file_for(layer_file: str) -> Path:
+    """给定 Layer 图文件名，返回对应的详情文件路径。"""
+    return base_dir() / f"{layer_file}.detail.toml"
 
 
-def load_details():
-    """加载当前 base 的 NodeDetails.toml（KV：节点id → 详细介绍文本）。不存在返回 {}。"""
-    df = details_file()
+def load_details_for(layer_file: str) -> dict:
+    """加载指定 Layer 图的详情文件。返回 {节点id: 详情文本}，不存在返回 {}。"""
+    df = detail_file_for(layer_file)
     if not df.exists():
         return {}
     try:
@@ -429,8 +429,8 @@ def load_details():
         return {}
 
 
-def save_details(details):
-    """写当前 base 的 NodeDetails.toml（多行字符串字面量，KV 形式）。"""
+def save_details_for(layer_file: str, details: dict):
+    """写指定 Layer 图的详情文件。"""
     lines = [
         "# 节点详细介绍（KV：节点id → 多行 markdown 读码笔记）",
         "# 由 graph_query.py -b 维护（vim 编辑），勿手改格式",
@@ -443,7 +443,54 @@ def save_details(details):
         lines.append(v)
         lines.append('"""')
         lines.append("")
-    details_file().write_text("\n".join(lines), encoding="utf-8")
+    detail_file_for(layer_file).write_text("\n".join(lines), encoding="utf-8")
+
+
+# 兼容旧接口（仅用于迁移时读取 NodeDetails.toml）
+def load_details():
+    """加载当前 base 的 NodeDetails.toml（兼容旧接口）。不存在返回 {}。"""
+    df = base_dir() / "NodeDetails.toml"
+    if not df.exists():
+        return {}
+    try:
+        with open(df, "rb") as f:
+            return tomllib.load(f).get("details", {})
+    except Exception:
+        return {}
+
+
+def migrate_nodedetails_to_detail_files():
+    """如果 NodeDetails.toml 存在且未迁移，自动迁移到分片文件。"""
+    old_file = base_dir() / "NodeDetails.toml"
+    if not old_file.exists():
+        return
+
+    # 检查是否已迁移（通过检查是否存在任意 .detail.toml 文件且旧文件无内容）
+    old_details = load_details()
+    if not old_details:
+        # 旧文件为空或已迁移，删除旧文件
+        old_file.unlink()
+        return
+
+    # 读取所有节点，建立 id -> layer_file 的映射
+    data = load()
+    nodes_by_id = {}
+    for n in data["nodes"]:
+        layer_file = n.get("source", "Layer-1-Graph")
+        nodes_by_id.setdefault(layer_file, {})[n["id"]] = old_details.get(n["id"], "")
+
+    # 按 layer_file 分片写入
+    migrated_count = 0
+    for layer_file, details in nodes_by_id.items():
+        # 只写入有内容的详情
+        details_with_content = {k: v for k, v in details.items() if v}
+        if details_with_content:
+            save_details_for(layer_file, details_with_content)
+            migrated_count += len(details_with_content)
+
+    # 删除旧文件
+    old_file.unlink()
+    print(f"✓ 已迁移 {migrated_count} 条详情到分片文件（{old_file.name} → *.detail.toml）")
 
 
 def build_detail(nid, text=None):
@@ -457,7 +504,16 @@ def build_detail(nid, text=None):
     target = matches[0]
     if len(matches) > 1:
         print(f"匹配 {len(matches)} 个，编辑第一个: {target}（其余: {', '.join(matches[1:5])}）")
-    details = load_details()
+
+    # 找到 target 所在的 layer_file
+    nodes_by_id = {n["id"]: n for n in nodes}
+    target_node = nodes_by_id.get(target, {})
+    layer_file = target_node.get("source", "Layer-1-Graph")
+
+    # 迁移检查：旧 NodeDetails.toml 存在时自动迁移
+    migrate_nodedetails_to_detail_files()
+
+    details = load_details_for(layer_file)
     old = details.get(target, "")
 
     if text is not None:
@@ -467,7 +523,7 @@ def build_detail(nid, text=None):
         else:
             details.pop(target, None)
             print(f"已删除 {target} 的详细介绍")
-        save_details(details)
+        save_details_for(layer_file, details)
         return 0
 
     import os
@@ -498,17 +554,20 @@ def build_detail(nid, text=None):
     else:
         details[target] = new
         print(f"✓ 已写入 {target} 的详细介绍（{len(new)} 字符）")
-    save_details(details)
+    save_details_for(layer_file, details)
     return 0
 
 
 def show_detail(nid, data):
     """-d 显示节点详细介绍（show 模式末尾调用）。"""
-    details = load_details()
+    # 找到 nid 所在的 layer_file
+    nodes = {n["id"]: n for n in data["nodes"]}
+    layer_file = nodes.get(nid, {}).get("source", "Layer-1-Graph")
+    details = load_details_for(layer_file)
     det = details.get(nid)
     print()
     if det:
-        print(f"-- 📖 详细介绍（NodeDetails.toml）--")
+        print(f"-- 📖 详细介绍（{layer_file}.detail.toml）--")
         print(det)
     else:
         print(f"（{nid} 暂无详细介绍，可执行 -b {nid} 添加）")
@@ -569,10 +628,19 @@ def validate(data, scope=None, layer_num=None):
     edges_all = data["edges"]
     errors, warnings = [], []
 
-    # 详情悬空检查（NodeDetails.toml 的 key 必须是合法节点 id；全局检查）
-    for k in load_details():
-        if k not in nodes_all:
-            errors.append(f"[详情] NodeDetails.toml 的 key 悬空（非合法节点）: {k}")
+    # 详情悬空检查（*.detail.toml 的 key 必须是合法节点 id；全局检查）
+    for df in base_dir().glob("*.detail.toml"):
+        # df.name 形如 "Layer-3-Graph-abc.toml.detail.toml"
+        # 从文件名提取 layer_file: "Layer-3-Graph-abc.toml"
+        suffix = ".detail.toml"
+        if df.name.endswith(suffix):
+            layer_file = df.name[:-len(suffix)]
+        else:
+            continue
+        details = load_details_for(layer_file)
+        for k in details:
+            if k not in nodes_all:
+                errors.append(f"[详情] {df.name} 的 key={k} 节点不存在")
 
     if layer_num is not None:
         layer_names = {p.name for p in base_dir().glob("Layer-*.toml") if p.name.startswith(f"Layer-{layer_num}-Graph")}
@@ -784,7 +852,7 @@ def main():
     parser.add_argument("-c", "--callchain", action="store_true", help="从入口展开调用链（树形+调用点行号）")
     parser.add_argument("-r", "--callers", action="store_true", help="反向调用链：谁在调用我")
     parser.add_argument("-b", "--build", action="store_true", help="构建/编辑节点详细介绍：--text 直写，缺省打开 $EDITOR(vim) 编辑临时文件")
-    parser.add_argument("-d", "--detail", action="store_true", help="查询时在末尾显示该节点的详细介绍（NodeDetails.toml）")
+    parser.add_argument("-d", "--detail", action="store_true", help="查询时在末尾显示该节点的详细介绍（Layer-*.detail.toml）")
     parser.add_argument("--text", help="配合 -b：直接写入的详细介绍文本（多行用 \\n）")
     parser.add_argument("--validate", action="store_true", help="图完整性校验：悬空边/path/行号/字段/详情key。范围=全部；配 -l 数字=某层文件；带关键词=匹配节点及其边")
     parser.add_argument("-p", "--purity", action="store_true", help="函数纯度分析：L0严格纯/L1工程纯/非纯/待验证 + 证据清单；一层调用者传递；只读不写盘（转发 purity.py）")
@@ -919,7 +987,7 @@ def main():
     if args.build:
         if not args.query:
             print("用法: python3 graph_query.py -b <节点id> [--text \"详细文本\"]")
-            print("     缺省打开 $EDITOR（缺省 vim）编辑临时文件，保存退出后写入 NodeDetails.toml")
+            print("     缺省打开 $EDITOR（缺省 vim）编辑临时文件，保存退出后写入 <Layer文件名>.detail.toml")
             sys.exit(1)
         sys.exit(build_detail(args.query, args.text))
 

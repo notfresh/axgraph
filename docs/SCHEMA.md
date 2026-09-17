@@ -54,12 +54,15 @@
 
 长期层关系不使用代码图专用的 `weight` 和 `at_line`：前者只表示 import 次数，后者只表示源码调用点行号。若需要源码证据，写入 `note` 或 `source`。
 
-## 8. 节点详细介绍（NodeDetails.toml）
+## 8. 节点详细介绍（`<Layer文件名>.detail.toml`）
 
-- 独立 KV 文件（**不带 `Layer-` 前缀**，避免被 load() 合并进节点图）；key=节点 id，value=多行 markdown 读码笔记。
+- 按 Layer 图分片的 KV 文件：节点在哪张 Layer 图里，详情就存在 `<Layer文件名>.detail.toml`。
+- 文件名形如：`Layer-1-Graph.toml.detail.toml`、`Layer-2-Graph.toml.detail.toml`、`Layer-3-Graph-abc.toml.detail.toml`。
+- 内容格式：`[details]` + `"节点id" = """多行 markdown 读码笔记"""`
 - 维护：`python3 graph_query.py -b <id>` 打开 $EDITOR（缺省 vim）编辑临时文件，保存退出自动写入；`--text` 直写；清空保存=删除该详情。
 - 查询：`python3 graph_query.py <id> -d` 末尾显示。
 - 校验：`--validate` 自动检查详情 key 必须是合法节点 id（悬空 = Error）。
+- 迁移：首次使用时会自动将旧 `NodeDetails.toml` 迁移到分片文件。
 
 ---
 
