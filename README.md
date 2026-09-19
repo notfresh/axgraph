@@ -5,7 +5,7 @@
 > diagnoses. Plugin form: installable into Claude Code and Kimi Code.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-1.1.2-blue)](VERSION)
 
 ## What is this?
 
@@ -50,7 +50,7 @@ users don't get auto-upgraded when you push to master:
 
 ```bash
 # Pin to a specific release (recommended for stable installs)
-kimi plugin install https://github.com/notfresh/axgraph/releases/tag/v0.1.0
+kimi plugin install https://github.com/notfresh/axgraph/releases/tag/v1.1.2
 
 # Pin to a commit SHA (for reproducibility)
 kimi plugin install https://github.com/notfresh/axgraph/commit/<sha>
@@ -80,13 +80,30 @@ If you cloned axgraph from GitHub directly (not via a host installer like Kimi C
 git clone https://github.com/notfresh/axgraph
 cd axgraph
 ./install.sh                    # creates ~/.local/bin/ax → axgraph/bin/ax
-ax --version                     # 0.1.0 — works from any cwd
+ax --version                     # 1.1.2 — works from any cwd
 ```
 
 The script checks whether `~/.local/bin` is on your PATH and prints the fix
 (`export PATH=...`) if not. Re-run `./install.sh` after `git pull` to refresh
 the symlink (it remains valid since it points at the file, not at a version
 hash, but running it again is harmless and idempotent).
+
+**Windows (PowerShell)** — equivalent of `install.sh`, generates an `ax.cmd`
+shim and adds `%USERPROFILE%\bin` to your user-level PATH:
+
+```powershell
+git clone https://github.com/notfresh/axgraph
+cd axgraph
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+ax --version                     # 1.1.2 — open a new PowerShell / cmd window first
+```
+
+`-ExecutionPolicy Bypass` only affects this one invocation. After install,
+**open a new shell window** so the new PATH is picked up (PowerShell / cmd
+inherit PATH at launch). Re-run `install.ps1` after `git pull` to refresh
+the shim — it's idempotent and skips PATH if the directory is already
+present. Pass a custom target dir as the first argument:
+`.\install.ps1 C:\Tools\bin`.
 
 **Manual PATH** — if you prefer not to symlink:
 
@@ -96,7 +113,7 @@ export PATH="$PWD/axgraph/bin:$PATH"
 ax --help
 ```
 
-To make it permanent: add the `export PATH=...` line to `~/.bashrc` (or your shell's rc file).
+To make it permanent: add the `export PATH=...` line to `~/.bashrc` (or your shell's rc file). On Windows, prefer `install.ps1` over manual PATH edits — it manages user-level PATH via the registry without admin rights.
 
 ### Installed via Kimi Code / Claude Code — `ax` in your shell?
 

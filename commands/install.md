@@ -1,5 +1,5 @@
 ---
-description: Symlink ~/.local/bin/ax → axgraph/bin/ax so `ax` is on your shell PATH (pip-install-style standalone install).
+description: Install `ax` onto the user's shell PATH so it works from any terminal (POSIX: symlink via install.sh; Windows: shim via install.ps1).
 ---
 
 # /axgraph:install — Symlink `ax` into your shell PATH
@@ -21,27 +21,103 @@ repo root.
    you can read it from the plugin metadata), use that. Otherwise ask the
    user.
 
-2. **Run the install script.** From the axgraph repo root:
+2. **Detect the OS.** The two install scripts are not interchangeable —
+   pick the right one based on the user's shell:
 
-   ```bash
-   ./install.sh
+   ```powershell
+   # PowerShell — single check that works for detection + dispatch
+   if ($IsWindows -or ($env:OS -like '*Windows*')) {
+       # → jump to step 3-Win
+   } else {
+       # → jump to step 3-POSIX
+   }
    ```
 
-   The script will:
-   - Detect `$AXGRAPH_ROOT` automatically (it's `$(dirname "$0")`-resolved)
-   - Symlink `~/.local/bin/ax` → `<axgraph>/bin/ax`
-   - Check whether `~/.local/bin` is on the user's PATH; if not, print the
-     `export PATH=...` line they need to add
-   - Print a one-line test command (`ax --version` should output `0.1.0`)
+   ```bash
+   # POSIX shells (bash / zsh)
+   if [[ "$(uname -s)" == *"Windows"* ]] || [[ -n "$WINDIR" ]]; then
+       # → jump to step 3-Win (rare — usually Git Bash / WSL are POSIX)
+   else
+       # → jump to step 3-POSIX
+   fi
+   ```
 
-   The script is idempotent — re-running just refreshes the symlink. Safe to
-   call after `git pull` or after the host upgrades axgraph.
+   Picking the wrong branch will silently fail (running `install.sh` on
+   Windows gives `bash: ./install.sh: No such file or directory` or similar).
+
+### 3-POSIX (Linux / macOS / WSL / Git Bash)
+
+From the axgraph repo root:
+
+```bash
+./install.sh
+```
+
+The script will:
+- Detect `$AXGRAPH_ROOT` automatically (it's `$(dirname "$0")`-resolved)
+- Symlink `~/.local/bin/ax` → `<axgraph>/bin/ax`
+- Check whether `~/.local/bin` is on the user's PATH; if not, print the
+  `export PATH=...` line they need to add
+- Print a one-line test command (`ax --version` should output `0.1.0`)
+
+The script is idempotent — re-running just refreshes the symlink. Safe to
+call after `git pull` or after the host upgrades axgraph.
+
+### 3-Win (Windows native — cmd / PowerShell)
+
+From the axgraph repo root, in PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+The `-ExecutionPolicy Bypass` is needed because Windows PowerShell's default
+execution policy (`Restricted` for clients, `RemoteSigned` for servers)
+blocks `.ps1` scripts by default. Bypassing only affects this one
+invocation — it does not change the system policy. If the user has already
+set `RemoteSigned` or `Unrestricted` system-wide, the flag is a no-op.
+
+The script will:
+- Detect `$AXGRAPH_ROOT` automatically from `$PSCommandPath`
+- Generate `%USERPROFILE%\bin\ax.cmd` (or the directory passed as the first
+  argument) — a small wrapper that calls `python %AX_GRAPH_ROOT%\bin\ax %*`
+- Add that directory to the user's PATH via `[Environment]::SetEnvironmentVariable`
+  (user-level, no admin required)
+- Print a one-line test command (`ax --version` should output `0.1.0`)
+
+The script is idempotent — re-running regenerates the shim and skips PATH
+if the directory is already present.
+
+**Note on new windows:** PowerShell / cmd processes inherit their PATH at
+launch. The user must open a new shell window after install for `ax` to be
+visible — current windows keep the old PATH.
 
 3. **Tell the user what happened.** Surface:
-   - Where the symlink landed (`~/.local/bin/ax → <axgraph>/bin/ax`)
-   - Whether `~/.local/bin` is on their PATH (and if not, the exact export
-     command to add)
-   - How to uninstall (`rm ~/.local/bin/ax`)
+   - **POSIX:** Where the symlink landed (`~/.local/bin/ax → <axgraph>/bin/ax`),
+     whether `~/.local/bin` is on their PATH (and if not, the exact export
+     command to add), and how to uninstall (`rm ~/.local/bin/ax`).
+   - **Windows:** Where the shim landed (`%USERPROFILE%\bin\ax.cmd`),
+     whether the directory was added to user PATH, and how to uninstall
+     (`Remove-Item $env:USERPROFILE\bin\ax.cmd` and remove the directory
+     from user PATH).
+
+**Windows-specific gotchas:**
+
+- PowerShell default `ExecutionPolicy` blocks `.ps1`. Always invoke with
+  `-ExecutionPolicy Bypass` (or set the process scope via
+  `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` before
+  calling).
+- PATH changes take effect only in **new** PowerShell / cmd windows —
+  tell the user to open a fresh window.
+- If `python` is not on the user's PATH, `ax.cmd` will fail with
+  `'python' is not recognized`. Have them re-run the Python installer
+  and check "Add Python to PATH", or install via the Microsoft Store
+  Python 3.x.
+- WSL / Git Bash users are **POSIX**, not Windows. They run `./install.sh`,
+  not `install.ps1`, even if their Windows username is the host.
+- The `ax.cmd` shim lives in the user's bin directory (default
+  `%USERPROFILE%\bin`) and is regenerated on every `install.ps1` run. To
+  uninstall, remove `ax.cmd` and the directory entry from user PATH.
 
 ## Important context
 
@@ -71,7 +147,7 @@ plugin's install path and doesn't need a symlink. So:
 
 ## Reference
 
-- `install.sh` — the underlying script (one source of truth, this command
-  is just documentation for it)
+- `install.sh` — POSIX install script (symlink-based)
+- `install.ps1` — Windows install script (cmd shim + user PATH)
 - README.md §"Installed via Kimi Code / Claude Code — `ax` in your shell?"
   — longer explanation of why this is needed and the 3 workarounds

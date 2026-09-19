@@ -1,6 +1,6 @@
 {
   "name": "axgraph",
-  "version": "1.1",
+  "version": "1.1.2",
   "description": "Build layered source-code graphs (TOML) for any project — query, validate, diagnose. Manual-graph discipline: humans in the loop, AI as accelerator.",
   "author": {
     "name": "notfresh@github"
