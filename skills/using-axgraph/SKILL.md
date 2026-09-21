@@ -43,20 +43,47 @@ description: |
    "manual", "validate", "实测", "at_line" — those words mean what they say.
    Do not soften or paraphrase them in your response.
 
+5. **Before you act on the graph, read `docs/AGENTS.md`.** This skill is a
+   behavior-shaping bootstrap — short on purpose. `docs/AGENTS.md` is the full
+   collaboration manual: three-layer structure (`Layer-1/2/3` + `gitCommit`
+   review graph in §3.1), validation severity (`✗ Error` vs `⚠ Warning` in §4),
+   row-number drift SOP (reinforced in §5–§6 and `docs/How-to-update-graph.md`),
+   when to escalate to the human (§7), and project-specific background (§8).
+   **Before proposing any node add/edit/delete, updating line numbers, or
+   answering a question that touches more than one base, Read `docs/AGENTS.md`
+   end-to-end and ground your action in it.** If a `docs/AGENTS.md` rule and
+   this skill disagree, `docs/AGENTS.md` wins (this skill is a subset).
+
 ## Available Commands
 
 ```
+# --- Query & validation ---
 ax init                          # Scaffold .axgraph/ in the current project
 ax query <id-or-keyword>         # Look up a node: details + in/out edges
 ax query <id> -c                 # Call-chain expansion (forward)
 ax query <id> -r                 # Reverse call chain (callers)
-ax query --bases                 # List all registered bases
-ax query --validate              # Run full validation
+ax query <id> -e                 # Relationship explanation in plain language
+ax query <id> -b [text]          # Build/edit the node's long-form note (Layer-*.detail.toml)
+ax query --bases                 # List all registered bases (active one marked)
+ax query --validate              # Run full validation (Error/Warning split)
+ax query <id> --update [--apply] # Per-node update; default dry-run diff, --apply writes
+ax query --base <name>           # Switch active base (also writes .active-base)
+
+# --- Analysis ---
 ax purity <id>                   # Function purity: L0 strict / L1 / impure
 ax diagnose <feature-id>         # Feature-chain cohesion + coupling analysis
+ax diagnose <feature-id> --json  # Same, structured JSON (script/AI friendly)
+
+# --- Authoring helpers ---
 ax extract <file.py>             # AST extract CALLS candidates (paste into TOML)
 ax --help                        # Show all subcommands
 ```
+
+> **Multi-base projects**: a project can hold multiple graphs side-by-side
+> (`base-dir-<name>/`, `base-file-<stem>/`), with the active one tracked in
+> `.active-base`. Before querying or editing, run `ax query --bases` and switch
+> with `ax query --base <name>` if needed. Full naming conventions are in
+> `docs/AGENTS.md` §2.
 
 When running inside Claude Code / Kimi Code, slash command equivalents are
 registered by the plugin: `/axgraph:install` (symlink `~/.local/bin/ax` so
@@ -70,20 +97,26 @@ once to set that up).
 
 ### When the user asks about ANY project's structure
 
-1. Run `ax query --bases` to confirm whether `.axgraph/` exists.
-2. If empty / missing → propose `ax init` BEFORE doing anything else. Do NOT
+1. **Read `docs/AGENTS.md` first.** §3 (three layers) + §4 (query cheatsheet)
+   + §8 (project background) are the minimal kit you need before answering.
+2. Run `ax query --bases` to confirm whether `.axgraph/` exists.
+3. If empty / missing → propose `ax init` BEFORE doing anything else. Do NOT
    invent a graph, do NOT skip and answer from memory.
-3. If it exists → run the appropriate query (`ax query`, `ax purity`,
+4. If it exists → run the appropriate query (`ax query`, `ax purity`,
    `ax diagnose`) and ground your answer in the returned data.
 
 ### When the user asks to MODIFY a graph
 
-1. Read the relevant code first (`cat <file>` or use your read tool).
-2. Understand the current implementation — graphs are a SIDE-EFFECT of reading,
+1. **Read `docs/AGENTS.md` §5–§6 and `docs/How-to-update-graph.md` first.**
+   These cover iron rules, the six-step new-node SOP, and the row-drift
+   handling protocol. Skipping them is the #1 way AI breaks manual-graph
+   discipline.
+2. Read the relevant code first (`cat <file>` or use your read tool).
+3. Understand the current implementation — graphs are a SIDE-EFFECT of reading,
    not a substitute for it.
-3. Use `ax extract <file.py>` to get AST candidates for new CALLS edges.
-4. Write the TOML by hand. Use `ax query --validate <id>` after each addition.
-5. Never silently update line numbers from "tool suggestions" — the iron rule
+4. Use `ax extract <file.py>` to get AST candidates for new CALLS edges.
+5. Write the TOML by hand. Use `ax query --validate <id>` after each addition.
+6. Never silently update line numbers from "tool suggestions" — the iron rule
    says: report to human, wait for human, read code, act, verify.
 
 ### When you want to suggest a graph change unprompted
