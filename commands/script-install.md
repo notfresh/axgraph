@@ -2,7 +2,7 @@
 description: Install `ax` onto the user's shell PATH so it works from any terminal (POSIX: symlink via install.sh; Windows: shim via install.ps1).
 ---
 
-# /axgraph:install — Symlink `ax` into your shell PATH
+# /axgraph:script-install — Symlink `ax` into your shell PATH
 
 This is the **standalone install path** — symlinking the axgraph wrapper into
 `~/.local/bin/` so typing `ax` in a fresh shell works without manually
@@ -125,7 +125,7 @@ visible — current windows keep the old PATH.
 host (Kimi / Claude Code) runs `ax` internally — the host already knows the
 plugin's install path and doesn't need a symlink. So:
 
-- If the user installed axgraph via Kimi/Claude Code, `/axgraph:install`
+- If the user installed axgraph via Kimi/Claude Code, `/axgraph:script-install`
   still helps: it gives them a way to use `ax` from their shell (e.g. for
   ad-hoc queries, scripts, cron jobs) without opening the host.
 - If the user did `git clone` + `./install.sh` themselves, this slash command

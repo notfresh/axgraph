@@ -170,7 +170,7 @@ ax query mod.agent -c -r
 
 | Command | Purpose |
 |---|---|
-| `/axgraph:install` | Symlink `~/.local/bin/ax` → axgraph wrapper (pip-install-style PATH setup) |
+| `/axgraph:script-install` | Symlink `~/.local/bin/ax` → axgraph wrapper (pip-install-style PATH setup) |
 | `/axgraph:init` | Scaffold `.axgraph/` in the current project |
 | `/axgraph:query <id-or-keyword>` | Look up a node, list bases, validate |
 | `/axgraph:purity <func-id>` | Function purity analysis (L0/L1/impure) |
