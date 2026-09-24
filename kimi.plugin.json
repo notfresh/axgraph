@@ -21,12 +21,12 @@
     "skill": "using-axgraph"
   },
   "pythonDependencies": {
-    "notes": "Python 3.11+ ships `tomllib` in stdlib. On 3.10, install `tomli` (`pip install tomli`) — graph_query.py and call_candidates.py auto-detect.",
+    "notes": "Requires Python 3.10+ (3.11+ recommended). On 3.11+, `tomllib` ships in stdlib. On 3.10, install `tomli` (`pip install tomli`) — graph_query.py and call_candidates.py auto-detect. Python 3.8 and 3.9 are NOT supported.",
     "requirements": [
       {
         "name": "tomli",
         "version": ">=2.0",
-        "python": "<3.11",
+        "python": ">=3.10,<3.11",
         "optional": true,
         "reason": "Backport of tomllib stdlib (3.11+)."
       }

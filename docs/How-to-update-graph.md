@@ -17,6 +17,7 @@
 | **调用关系（常动）** | CALLS 边的 `at_line = 725` | commit 改了调用点→**改** |
 | **依赖权重（偶动）** | DEPENDS_ON 的 `weight = 12` | 文件新增/删除 import→**改** |
 | **语义描述（极少动）** | `desc = "加载 skill 载荷"`、`kind = "function"` | commit 改了函数语义→**改**（要读代码确认） |
+| **格式字段（必带）** | `[[nodes]]` 行尾 `# 节点 <id>: <≤15 字说明>` | commit 后 id 改名 / desc 变了 → **改**（注释与 desc 保持一致） |
 | **feature 节点** | `feature.skill_load` 自身 | 仅当该功能被重构或废弃→**改**；纯 bugfix 不动 |
 
 **所以 80% 的更新工作集中在三件事**：

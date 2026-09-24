@@ -20,6 +20,14 @@ direct imports are 5x faster and avoid the "script not found after install" clas
 of bugs. We still respect $AX_GRAPH_PYTHON (defaults to /usr/bin/env python3) so
 users with venv quirks can override.
 
+Python version handling:
+    bin/ax needs Python 3.11+ (stdlib tomllib). If we're launched under an older
+    interpreter, we look for a 3.11+ one and re-exec into it transparently:
+        Windows:  py -3.11  (Python Launcher for Windows)
+        POSIX:    python3.11 / python3.12 / python3.13 on PATH
+    Escape hatch: set AX_GRAPH_PYTHON_STRICT=1 to skip the re-exec and use the
+    current interpreter (e.g. you've installed `tomli` on 3.10 and want to stay).
+
 Resolution order for plugin root:
     1. $AX_GRAPH_ROOT (explicit override)
     2. Walk up from this file: .../axgraph/bin/ax  →  ../  is the plugin root
@@ -31,8 +39,110 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
+
+
+_MIN_PY = (3, 11)
+
+
+def _py_version_tuple(cmd: list[str]) -> tuple[int, int] | None:
+    """Run `cmd -c '...'` and parse (major, minor) from stdout, or None on failure."""
+    try:
+        out = subprocess.run(
+            cmd + ["-c", "import sys; print(sys.version_info.major, sys.version_info.minor)"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    parts = out.stdout.strip().split()
+    if len(parts) != 2:
+        return None
+    try:
+        return int(parts[0]), int(parts[1])
+    except ValueError:
+        return None
+
+
+def _find_newer_python() -> list[str] | None:
+    """Locate a Python >= _MIN_PY interpreter we can re-exec into. Returns the
+    command (argv form for subprocess) or None if not found.
+
+    Strategy:
+      - Windows: prefer `py -3.11` via the Python Launcher; fall back to
+        python3.11/3.12/3.13 on PATH.
+      - POSIX: try python3.11, python3.12, python3.13, python3 in that order.
+    """
+    candidates: list[list[str]] = []
+    if sys.platform == "win32":
+        py = shutil.which("py")
+        if py:
+            candidates.append([py, "-3.11"])
+            candidates.append([py, "-3.12"])
+            candidates.append([py, "-3.13"])
+        candidates.extend([["python3.11"], ["python3.12"], ["python3.13"]])
+    else:
+        candidates.extend([["python3.11"], ["python3.12"], ["python3.13"], ["python3"]])
+
+    for cmd in candidates:
+        if not shutil.which(cmd[0]):
+            continue
+        ver = _py_version_tuple(cmd)
+        if ver is None:
+            continue
+        if ver >= _MIN_PY:
+            return cmd
+    return None
+
+
+def _maybe_reexec_into_newer_python() -> None:
+    """If the current interpreter is below _MIN_PY and the user hasn't opted
+    out, re-exec this same `ax` script under a newer Python and exit.
+
+    This runs *before* any lib/*.py import so that the fallback chain in
+    graph_query.py / call_candidates.py never gets a chance to print its
+    "Python X.X is not supported" message to users on 3.8 / 3.10.
+    """
+    if sys.version_info >= _MIN_PY:
+        return
+    if os.environ.get("AX_GRAPH_PYTHON_STRICT") == "1":
+        return
+
+    current = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    target = _find_newer_python()
+    if target is None:
+        print(
+            f"ax: running under Python {current}, but axgraph needs "
+            f"{_MIN_PY[0]}.{_MIN_PY[1]}+ and no newer interpreter was found.",
+            file=sys.stderr,
+        )
+        print(
+            "    Install Python 3.11+ (recommended), or set AX_GRAPH_PYTHON_STRICT=1 "
+            "to use the current interpreter anyway.",
+            file=sys.stderr,
+        )
+        return  # let it continue — lib/*.py will print its own version-aware message
+
+    argv0 = sys.argv[0]
+    cmd = target + [argv0] + sys.argv[1:]
+
+    print(
+        f"ax: detected Python {current}; re-executing under {target[0]} (>= {_MIN_PY[0]}.{_MIN_PY[1]})",
+        file=sys.stderr,
+    )
+    try:
+        rc = subprocess.call(cmd, env=os.environ.copy())
+    except OSError as e:
+        print(f"ax: failed to re-exec under {target[0]}: {e}", file=sys.stderr)
+        return
+    sys.exit(rc)
+
+
+_maybe_reexec_into_newer_python()
 
 
 def _resolve_plugin_root() -> Path:
@@ -80,6 +190,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--root", help="Override plugin root (default: auto-detect from this script's location).")
     p.add_argument("--version", action="store_true", help="Show plugin version and exit.")
+    p.add_argument("--python-info", action="store_true",
+                   help="Print current Python interpreter path/version and exit (useful when ax silently re-execs into a newer one).")
     sub = p.add_subparsers(dest="cmd", metavar="<subcommand>")
 
     # init — special: does NOT need an existing .axgraph/, creates one
@@ -178,6 +290,15 @@ def main() -> int:
             print(version_file.read_text().strip())
         else:
             print("ax: version file not present (dev install?)")
+        return 0
+
+    if args.python_info:
+        print(f"python_executable = {sys.executable}")
+        print(f"python_version    = {sys.version.split()[0]}")
+        print(f"python_required   = >= {_MIN_PY[0]}.{_MIN_PY[1]}")
+        if sys.version_info < _MIN_PY:
+            print(f"note              = current interpreter is below required; "
+                  f"if this came from a re-exec, the original was even older.")
         return 0
 
     if not args.cmd:

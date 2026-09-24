@@ -71,6 +71,7 @@
 | 字段 | 必填 | 说明 |
 |---|---|---|
 | `id` | ✅ 必填 | 全局唯一。命名前缀表意（见 §3），重复定义会覆盖！ |
+| `[[nodes]]` 行尾注释 | 必带 | `# 节点 <id>: <≤15 字说明>`，与 `desc` 一致。详见 `AGENTS.md` §5 铁律 6 |
 | `kind` | ✅ 必填 | 代码图取值：`module` / `file` / `cluster` / `subpackage` / `feature` / `function` / `constants` / `gitCommit`；长期层取值：`principle` / `constraint` / `decision` / `invariant` |
 | `path` | ✅ 必填 | 相对仓库根路径。**function/constants 和长期层节点必须带 `:行号`**（如 `agent/skill_utils.py:27`、`AGENTS.md:19`）；file/module/cluster/subpackage/feature 不带 |
 | `layer` | ✅ 必填 | 取值：`core` / `capability` / `interface` / `application` / `entry` / `infra` |
@@ -157,6 +158,8 @@ from = "feature.your-feature"
 to = "func.agent.foo.bar"
 rel = "REALIZED_BY"
 ```
+
+> **格式铁律（`AGENTS.md` §5 铁律 6）**：`[[nodes]]` 行必须带尾注释 `# 节点 <id>: <≤15 字说明>`，与 `desc` 一致。本示例 L135 的注释即标准模板；新增节点时按此填写。
 
 ## 7. 删除注意事项
 

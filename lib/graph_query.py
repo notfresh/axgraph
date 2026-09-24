@@ -19,12 +19,20 @@ import re
 try:
     import tomllib  # Python 3.11+ stdlib
 except ImportError:  # pragma: no cover
-    try:
-        import tomli as tomllib  # 3.10 backport: `pip install tomli`
-    except ImportError:
+    py = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    if sys.version_info >= (3, 10):
+        try:
+            import tomli as tomllib  # 3.10 backport: `pip install tomli`
+        except ImportError:
+            sys.exit(
+                f"graph_query.py: Python {py} detected and `tomli` is not installed.\n"
+                "Fix: `pip install tomli`   (or upgrade to Python 3.11+)."
+            )
+    else:
         sys.exit(
-            "graph_query.py: Python 3.10 detected and `tomli` is not installed.\n"
-            "Fix: `pip install tomli`   (or upgrade to Python 3.11+)."
+            f"graph_query.py: Python {py} is not supported "
+            "(requires 3.10+; 3.11+ recommended).\n"
+            "Fix: upgrade to Python 3.11+   (stdlib `tomllib`, no extra packages)."
         )
 import difflib
 import argparse
